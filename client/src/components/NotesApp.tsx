@@ -457,7 +457,8 @@ export default function NotesApp() {
               placeholder="搜尋筆記內容或標籤..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 bg-[var(--control-button-bg)] border-[var(--control-button-border)]"
+              className="pl-10 bg-[var(--control-button-bg)] border-[var(--control-button-border)] touch-feedback"
+              style={{ fontSize: '16px' }}
             />
           </div>
 
@@ -734,10 +735,11 @@ export default function NotesApp() {
 
       {/* Settings Modal */}
       <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
-        <DialogContent className="max-w-md mx-4 max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-md mx-4 max-h-[90vh] overflow-y-auto" aria-describedby="settings-description">
           <DialogHeader>
             <DialogTitle>設定</DialogTitle>
           </DialogHeader>
+          <p id="settings-description" className="sr-only">筆記應用程式的設定選項，包括密碼管理、資料匯入匯出和其他偏好設定</p>
           <div className="space-y-6">
             {/* Password settings */}
             <div>
@@ -803,7 +805,7 @@ export default function NotesApp() {
                 <span>刪除筆記時需要確認</span>
                 <Checkbox
                   checked={requireDeleteConfirmation}
-                  onCheckedChange={setRequireDeleteConfirmation}
+                  onCheckedChange={(checked) => setRequireDeleteConfirmation(checked as boolean)}
                 />
               </div>
             </div>
@@ -825,10 +827,11 @@ export default function NotesApp() {
 
       {/* Password Prompt Modal */}
       <Dialog open={showPasswordPrompt} onOpenChange={setShowPasswordPrompt}>
-        <DialogContent className="max-w-sm mx-4">
+        <DialogContent className="max-w-sm mx-4" aria-describedby="password-description">
           <DialogHeader>
             <DialogTitle>請輸入密碼</DialogTitle>
           </DialogHeader>
+          <p id="password-description" className="sr-only">輸入全域密碼以執行受保護的操作</p>
           <div className="space-y-4">
             <Input
               type="password"
