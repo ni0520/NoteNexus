@@ -224,8 +224,23 @@
 
   /* Touch feedback */
   .touch-feedback:active {
-    transform: scale(0.95);
+    transform: scale(0.95) translateZ(0);
     transition: transform 0.1s ease;
+  }
+
+  /* Better button styles for mobile */
+  button, .btn {
+    -webkit-appearance: none;
+    appearance: none;
+    -webkit-tap-highlight-color: transparent;
+    outline: none;
+    position: relative;
+  }
+
+  /* Improve scrolling performance */
+  * {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
   }
 
   /* Safe area utilities */
