@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>小筆記 Pro</title>
+  <style>
+    :root {
+      --bg-color: #f0f2f5;
+      --text-color: #333;
+      --card-bg-color: #fff;
+      --primary-color: #1877f2;
+      --secondary-color: #6c757d;
+      --note-bg-color: #e7f3ff;
+      --note-text-color: #333;
+      --input-border-color: #ccc;
+      --button-text-color: #fff;
+      --danger-color: #dc3545;
+      --success-color: #28a745;
+      --warning-color: #ffc107;
+      --info-color: #0dcaf0;
+      --tag-default-text-color: #fff;
+      --header-text-color: var(--primary-color);
+      --control-button-bg: #f8f9fa;
+      --control-button-border: #dee2e6;
+      --control-button-text: #495057;
+      --control-button-hover-bg: #e9ecef;
+      --modal-overlay-bg: rgba(0, 0, 0, 0.6);
+      --modal-content-bg: var(--card-bg-color);
+      --locked-color: var(--warning-color);
+      --hidden-note-opacity: 0.6;
+      --hidden-note-label-color: var(--secondary-color);
+    }
+
+    body.theme-dark {
+      --bg-color: #121212;
+      --text-color: #e0e0e0;
+      --card-bg-color: #1e1e1e;
+      --primary-color: #3b82f6; 
+      --secondary-color: #8f969d;
+      --note-bg-color: #2a2a2e;
+      --note-text-color: #e0e0e0;
+      --input-border-color: #444;
+      --header-text-color: var(--primary-color);
+      --control-button-bg: #2c2c2e;
+      --control-button-border: #3a3a3c;
+      --control-button-text: #c0c0c0;
+      --control-button-hover-bg: #38383a;
+      --locked-color: #f8bb86; /* Lighter warning for dark */
+      --hidden-note-label-color: #a0a0a0;
+    }
+
+    body.theme-sepia {
+      --bg-color: #f4ecd8;
+      --text-color: #5b4636;
+      --card-bg-color: #fffbf0;
+      --primary-color: #7d6046;
+      --secondary-color: #9a8a78;
+      --note-bg-color: #f0e6d0;
+      --note-text-color: #5b4636;
+      --input-border-color: #dcd0b8;
+      --header-text-color: var(--primary-color);
+      --control-button-bg: #e9e0cf;
+      --control-button-border: #d9cabd;
+      --control-button-text: #6a5849;
+      --control-button-hover-bg: #e1d8c7;
+      --locked-color: #d9a362; /* Sepia warning */
+      --hidden-note-label-color: #8c7f70;
+    }
+
+    body.theme-gray {
+      --bg-color: #D1D5DB; 
+      --text-color: #1F2937; 
+      --card-bg-color: #E5E7EB; 
+      --primary-color: #4B5563; 
+      --secondary-color: #6B7280; 
+      --note-bg-color: #F3F4F6; 
+      --note-text-color: #1F2937;
+      --input-border-color: #9CA3AF; 
+      --button-text-color: #FFFFFF;
+      --danger-color: #EF4444; 
+      --success-color: #22C55E; 
+      --warning-color: #F59E0B; 
+      --info-color: #3B82F6; 
+      --tag-default-text-color: #fff;
+      --header-text-color: var(--primary-color);
+      --control-button-bg: #E5E7EB;
+      --control-button-border: #D1D5DB;
+      --control-button-text: #374151; 
+      --control-button-hover-bg: #D1D5DB;
+      --modal-overlay-bg: rgba(0, 0, 0, 0.5);
+      --modal-content-bg: var(--card-bg-color);
+      --locked-color: var(--warning-color);
+      --hidden-note-label-color: var(--secondary-color);
+    }
+
+    body.theme-green {
+      --bg-color: #ECFDF5; 
+      --text-color: #065F46; 
+      --card-bg-color: #D1FAE5; 
+      --primary-color: #10B981; 
+      --secondary-color: #34D399; 
+      --note-bg-color: #A7F3D0; 
+      --note-text-color: #047857; 
+      --input-border-color: #6EE7B7; 
+      --button-text-color: #FFFFFF;
+      --danger-color: #EF4444; 
+      --success-color: #22C55E; 
+      --warning-color: #F59E0B; 
+      --info-color: #3B82F6; 
+      --tag-default-text-color: #fff;
+      --header-text-color: var(--primary-color);
+      --control-button-bg: #D1FAE5;
+      --control-button-border: #A7F3D0;
+      --control-button-text: #065F46;
+      --control-button-hover-bg: #A7F3D0;
+      --modal-overlay-bg: rgba(0, 0, 0, 0.5);
+      --modal-content-bg: var(--card-bg-color);
+      --locked-color: var(--warning-color);
+      --hidden-note-label-color: var(--secondary-color);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
+        Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+      transition: background-color 0.3s ease, color 0.3s ease;
+      line-height: 1.6;
+    }
+
+    #root {
+      width: 100%;
+      max-width: 800px; 
+      background-color: var(--card-bg-color);
+      padding: 25px;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      transition: background-color 0.3s ease;
+    }
+
+    h1 {
+      text-align: center;
+      color: var(--header-text-color);
+      margin-bottom: 20px;
+    }
+
+    .app-controls {
+      display: flex;
+      flex-direction: column; 
+      gap: 15px;
+      margin-bottom: 25px;
+      padding-bottom: 15px;
+      border-bottom: 1px solid var(--input-border-color);
+    }
+    
+    .app-controls-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .control-group {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap; 
+    }
+    .control-group.selection-controls { /* For select all checkbox and hide button */
+        justify-content: flex-start; /* Align items to the start */
+    }
+    .control-group.selection-controls input[type="checkbox"] {
+        accent-color: var(--primary-color);
+        width: 16px;
+        height: 16px;
+        margin-right: 5px;
+    }
+    
+    .app-controls label, .modal-label {
+      margin-right: 5px;
+      font-size: 0.9em;
+      color: var(--text-color);
+    }
+
+    .app-controls select,
+    .control-button,
+    .modal-button {
+      padding: 8px 12px;
+      border: 1px solid var(--control-button-border);
+      border-radius: 6px;
+      background-color: var(--control-button-bg);
+      color: var(--control-button-text);
+      font-size: 14px;
+      cursor: pointer;
+      transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+    }
+    .control-button:disabled {
+        background-color: var(--secondary-color);
+        opacity: 0.6;
+        cursor: not-allowed;
+        border-color: var(--secondary-color);
+    }
+
+
+    .app-controls select:hover,
+    .control-button:not(:disabled):hover,
+    .modal-button:not(:disabled):hover {
+      background-color: var(--control-button-hover-bg);
+    }
+    
+    .app-controls select {
+        min-width: 120px; 
+    }
+
+    .search-input,
+    .modal-input {
+      padding: 8px 12px;
+      border: 1px solid var(--input-border-color);
+      border-radius: 6px;
+      font-size: 14px;
+      background-color: var(--card-bg-color);
+      color: var(--text-color);
+      flex-grow: 1; 
+    }
+    
+    .file-input-label {
+      padding: 8px 12px;
+      border: 1px solid var(--control-button-border);
+      border-radius: 6px;
+      background-color: var(--control-button-bg);
+      color: var(--control-button-text);
+      font-size: 14px;
+      cursor: pointer;
+      display: inline-block;
+      transition: background-color 0.2s ease;
+    }
+    .file-input-label:hover {
+      background-color: var(--control-button-hover-bg);
+    }
+    input[type="file"] {
+      display: none; 
+    }
+
+
+    .note-input-section {
+       margin-bottom: 25px;
+    }
+
+    .note-form {
+      display: flex;
+      flex-direction: column; 
+      gap: 12px;
+    }
+
+    .note-textarea,
+    .note-tags-input {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid var(--input-border-color);
+      border-radius: 6px;
+      font-size: 16px;
+      resize: vertical;
+      box-sizing: border-box; 
+      background-color: var(--card-bg-color); 
+      color: var(--text-color); 
+    }
+
+    .note-textarea {
+      min-height: 70px;
+    }
+    
+    .note-tags-input {
+      font-size: 14px;
+    }
+
+    .add-note-button {
+      padding: 12px 18px;
+      background-color: var(--primary-color);
+      color: var(--button-text-color);
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+      align-self: flex-end; 
+    }
+
+    .add-note-button:hover {
+      opacity: 0.9;
+    }
+
+    .notes-list {
+      list-style: none;
+      padding: 0;
+      margin-top: 20px;
+    }
+
+    .note-item {
+      background-color: var(--note-bg-color);
+      color: var(--note-text-color);
+      padding: 18px;
+      border-radius: 8px;
+      margin-bottom: 12px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+      transition: background-color 0.3s ease, color 0.3s ease, opacity 0.3s ease;
+      position: relative; 
+      display: flex; /* For checkbox alignment */
+      gap: 10px; /* Space between checkbox and content */
+    }
+    
+    .note-selection-area input[type="checkbox"] {
+        accent-color: var(--primary-color);
+        width: 18px; /* Slightly larger checkbox */
+        height: 18px;
+        margin-top: 3px; /* Align with first line of text */
+        cursor: pointer;
+    }
+    .note-item-content-wrapper {
+        flex-grow: 1; /* Allow content to take remaining space */
+    }
+    
+    .note-item.is-hidden {
+        opacity: var(--hidden-note-opacity);
+    }
+    .note-item.is-hidden .note-content,
+    .note-item.is-hidden .note-tags-container,
+    .note-item.is-hidden .note-item-actions .edit-button { /* Edit button also affected */
+        pointer-events: none; /* Prevent interaction with content of hidden notes */
+    }
+
+    .note-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+    }
+    
+    .note-status-icons {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .note-lock-icon {
+        font-size: 1.2em;
+        color: var(--locked-color);
+    }
+    .note-lock-icon svg { 
+        width: 1em;
+        height: 1em;
+        fill: currentColor;
+    }
+    .note-hidden-label {
+        font-size: 0.8em;
+        font-style: italic;
+        color: var(--hidden-note-label-color);
+    }
+
+
+    .note-main-content { 
+        margin-bottom: 10px;
+    }
+
+    .note-content {
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 1.05em; 
+    }
+    
+    .note-timestamps {
+      font-size: 0.75em;
+      color: var(--secondary-color);
+      margin-top: 8px;
+      opacity: 0.8;
+    }
+    .note-timestamps span {
+        display: block;
+    }
+
+    .note-tags-container {
+      margin-top: 10px;
+      margin-bottom: 10px; 
+    }
+
+    .tag-item {
+      display: inline-block;
+      padding: 3px 9px;
+      margin-right: 6px;
+      margin-bottom: 6px;
+      border-radius: 12px; 
+      font-size: 0.8em;
+      font-weight: 500;
+      color: var(--tag-default-text-color); 
+      background-color: var(--secondary-color); 
+      transition: transform 0.1s ease, background-color 0.3s ease, color 0.3s ease;
+    }
+    .tag-item:hover {
+        transform: translateY(-1px);
+    }
+
+    .note-edit-form { 
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        width: 100%; /* Ensure edit form takes full width inside li */
+    }
+
+    .note-edit-textarea {
+      width: 100%;
+      padding: 12px;
+      margin-bottom: 5px; 
+      border: 1px solid var(--primary-color);
+      border-radius: 6px;
+      font-size: 16px;
+      resize: vertical;
+      min-height: 80px;
+      box-sizing: border-box;
+      background-color: var(--card-bg-color);
+      color: var(--text-color);
+    }
+
+    .note-item-actions {
+      display: flex;
+      gap: 8px; 
+      margin-top: 10px; 
+      justify-content: flex-end;
+      flex-wrap: wrap; 
+    }
+
+    .note-button { 
+      padding: 7px 12px; 
+      border: none;
+      border-radius: 5px;
+      font-size: 13px; 
+      cursor: pointer;
+      transition: background-color 0.3s ease, opacity 0.3s ease, color 0.3s ease;
+      color: var(--button-text-color);
+    }
+    
+    .edit-button { background-color: var(--success-color); }
+    .update-button { background-color: var(--primary-color); }
+    .cancel-button { background-color: var(--secondary-color); }
+    .delete-note-button { background-color: var(--danger-color); }
+    .lock-button { background-color: var(--info-color); }
+    .lock-button.locked { background-color: var(--locked-color); }
+    body.theme-gray .lock-button.locked, body.theme-green .lock-button.locked { color: var(--text-color); } 
+
+
+    .edit-button:hover, .update-button:hover, .cancel-button:hover, 
+    .delete-note-button:hover, .lock-button:hover {
+      opacity: 0.85;
+    }
+    .edit-button:disabled {
+        background-color: var(--secondary-color);
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+
+    .empty-notes-message {
+      text-align: center;
+      color: var(--secondary-color);
+      padding: 25px;
+      font-style: italic;
+    }
+
+    /* Modal Styles */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: var(--modal-overlay-bg);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      padding: 15px; 
+      box-sizing: border-box;
+    }
+
+    .modal-content {
+      background-color: var(--modal-content-bg);
+      padding: 25px;
+      border-radius: 8px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+      width: 90%;
+      max-width: 600px; 
+      color: var(--text-color);
+      max-height: 85vh; 
+      overflow-y: auto;
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--input-border-color);
+    }
+    .modal-header h2 {
+      margin: 0;
+      color: var(--header-text-color);
+    }
+    .modal-close-button {
+      background: none;
+      border: none;
+      font-size: 1.8em;
+      cursor: pointer;
+      color: var(--text-color);
+      line-height: 1;
+    }
+    .modal-close-button:hover {
+        opacity: 0.7;
+    }
+
+    .modal-section {
+      margin-bottom: 25px; 
+      padding-bottom: 15px; 
+      border-bottom: 1px solid var(--input-border-color); 
+    }
+    .modal-section:last-child {
+        border-bottom: none; 
+        margin-bottom: 0;
+    }
+    .modal-section h3 {
+      margin-top: 0;
+      margin-bottom: 12px; 
+      color: var(--primary-color);
+      font-size: 1.15em; 
+    }
+    .modal-input-group {
+      margin-bottom: 15px; 
+    }
+    .modal-input-group label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 500;
+    }
+    .modal-input {
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .modal-input.small { 
+        width: auto;
+        flex-grow: 1;
+        max-width: 200px;
+    }
+    .modal-warning {
+        font-size: 0.9em; 
+        color: var(--danger-color);
+        margin-top: 8px; 
+        margin-bottom: 8px;
+    }
+    .modal-info-text {
+        font-size: 0.85em;
+        color: var(--secondary-color);
+        margin-top: 5px;
+        margin-bottom: 10px;
+    }
+    .modal-feedback-text {
+        font-size: 0.9em;
+        color: var(--success-color);
+        margin-top: 10px;
+    }
+
+    .modal-checkbox-group {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .modal-checkbox-group input[type="checkbox"] {
+        accent-color: var(--primary-color);
+        width: 16px;
+        height: 16px;
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 25px; 
+    }
+    .modal-button.primary {
+        background-color: var(--primary-color);
+        color: var(--button-text-color);
+    }
+     .modal-button.secondary {
+        background-color: var(--secondary-color);
+        color: var(--button-text-color);
+    }
+    .modal-button.danger {
+        background-color: var(--danger-color);
+        color: var(--button-text-color);
+    }
+    .modal-button.small {
+        padding: 5px 10px;
+        font-size: 0.85em;
+    }
+    .modal-button:disabled {
+        background-color: var(--secondary-color);
+        opacity: 0.7;
+        cursor: not-allowed;
+    }
+
+    /* Tag Management Styles */
+    .tag-management-list {
+        list-style: none;
+        padding: 0;
+        max-height: 200px; 
+        overflow-y: auto;
+        border: 1px solid var(--input-border-color);
+        border-radius: 6px;
+    }
+    .tag-management-item {
+        padding: 10px;
+        border-bottom: 1px solid var(--input-border-color);
+        display: flex;
+        flex-direction: column; 
+        gap: 8px;
+    }
+    .tag-management-item:last-child {
+        border-bottom: none;
+    }
+    .tag-management-item.selected {
+        background-color: rgba(0,0,0,0.05); 
+    }
+    body.theme-dark .tag-management-item.selected { background-color: rgba(255,255,255,0.05); }
+    body.theme-gray .tag-management-item.selected { background-color: rgba(0,0,0,0.07); }
+    body.theme-green .tag-management-item.selected { background-color: rgba(0,0,0,0.07); }
+
+    .tag-management-actions {
+        display: flex;
+        flex-wrap: wrap; 
+        gap: 8px;
+        align-items: center;
+        margin-top: 5px;
+        padding-top: 8px;
+        border-top: 1px dashed var(--input-border-color);
+    }
+    .tag-color-palette {
+        display: flex;
+        gap: 5px;
+        flex-wrap: wrap; 
+        margin: 5px 0;
+    }
+    .color-swatch {
+        width: 20px;
+        height: 20px;
+        border: 1px solid var(--input-border-color);
+        border-radius: 4px;
+        cursor: pointer;
+        transition: transform 0.1s ease;
+    }
+    .color-swatch:hover {
+        transform: scale(1.1);
+        border-color: var(--primary-color);
+    }
+
+    /* Danger Zone */
+    .danger-zone {
+        border-top: 2px solid var(--danger-color); 
+        margin-top: 20px;
+        padding-top: 20px;
+    }
+    .danger-zone h3 {
+        color: var(--danger-color);
+    }
+
+
+    /* Accessibility */
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border-width: 0;
+    }
+
+  </style>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.1.0",
+    "react/jsx-runtime": "https://esm.sh/react@^19.1.0/jsx-runtime",
+    "react-dom/client": "https://esm.sh/react-dom@^19.1.0/client",
+    "react-dom/": "https://esm.sh/react-dom@^19.1.0/",
+    "react/": "https://esm.sh/react@^19.1.0/"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
