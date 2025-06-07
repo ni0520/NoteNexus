@@ -71,6 +71,8 @@ export default function NotesApp() {
   const [showPasswordPrompt, setShowPasswordPrompt] = useState(false);
   const [passwordPromptInput, setPasswordPromptInput] = useState('');
   const [pendingAction, setPendingAction] = useState<{ type: string; noteId?: string; noteIds?: string[] } | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [noteToDelete, setNoteToDelete] = useState<Note | null>(null);
   const [allTags, setAllTags] = useState<Map<string, string>>(new Map());
 
   // Load saved data on mount
@@ -228,12 +230,22 @@ export default function NotesApp() {
     }
 
     if (requireDeleteConfirmation) {
-      const confirmed = window.confirm(`確定要刪除筆記 "${note.text.substring(0, 30)}..." 嗎？`);
-      if (!confirmed) return;
+      setNoteToDelete(note);
+      setShowDeleteConfirm(true);
+      return;
     }
 
     deleteNote(note.id);
     setSelectedNoteIds(prev => prev.filter(id => id !== note.id));
+  };
+
+  const confirmDeleteNote = () => {
+    if (noteToDelete) {
+      deleteNote(noteToDelete.id);
+      setSelectedNoteIds(prev => prev.filter(id => id !== noteToDelete.id));
+    }
+    setShowDeleteConfirm(false);
+    setNoteToDelete(null);
   };
 
   const handleToggleLock = (note: Note) => {
@@ -593,27 +605,35 @@ export default function NotesApp() {
                           <Textarea
                             value={editingNoteText}
                             onChange={(e) => setEditingNoteText(e.target.value)}
-                            className="min-h-[80px]"
+                            className="min-h-[80px] bg-[var(--card-bg-color)] border-[var(--input-border-color)] touch-feedback"
+                            style={{ fontSize: '16px' }}
+                            autoFocus
                           />
                           <Input
                             type="text"
                             value={editingTagsInput}
                             onChange={(e) => setEditingTagsInput(e.target.value)}
                             placeholder="標籤（用逗號分隔）"
+                            className="bg-[var(--card-bg-color)] border-[var(--input-border-color)] touch-feedback"
+                            style={{ fontSize: '16px' }}
                           />
                           <div className="flex gap-2">
                             <Button
                               size="sm"
                               onClick={() => handleUpdateNote(note.id)}
-                              className="min-touch-target flex-1"
+                              className="min-touch-target flex-1 touch-feedback"
                             >
                               更新
                             </Button>
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => setEditingNoteId(null)}
-                              className="min-touch-target flex-1"
+                              onClick={() => {
+                                setEditingNoteId(null);
+                                setEditingNoteText('');
+                                setEditingTagsInput('');
+                              }}
+                              className="min-touch-target flex-1 touch-feedback"
                             >
                               取消
                             </Button>
@@ -722,7 +742,7 @@ export default function NotesApp() {
       {/* Floating action button for mobile */}
       {isMobile && (
         <Button
-          className="fixed bottom-6 right-6 w-14 h-14 rounded-full shadow-lg z-40"
+          className="fixed bottom-6 left-6 w-14 h-14 rounded-full shadow-lg z-40 touch-feedback"
           onClick={() => {
             const noteContent = document.querySelector('textarea');
             noteContent?.focus();
@@ -860,6 +880,37 @@ export default function NotesApp() {
                 取消
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Modal */}
+      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <DialogContent className="max-w-sm mx-4" aria-describedby="delete-description">
+          <DialogHeader>
+            <DialogTitle>確認刪除</DialogTitle>
+          </DialogHeader>
+          <p id="delete-description" className="text-sm text-gray-600 mb-4">
+            確定要刪除筆記 "{noteToDelete?.text.substring(0, 30)}..." 嗎？此操作無法復原。
+          </p>
+          <div className="flex gap-2">
+            <Button
+              variant="destructive"
+              onClick={confirmDeleteNote}
+              className="flex-1 min-touch-target touch-feedback"
+            >
+              確定刪除
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowDeleteConfirm(false);
+                setNoteToDelete(null);
+              }}
+              className="flex-1 min-touch-target touch-feedback"
+            >
+              取消
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
