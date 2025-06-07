@@ -186,6 +186,7 @@
     border-radius: 8px;
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
+    box-sizing: border-box;
   }
   
   input, textarea {
@@ -193,6 +194,8 @@
     -moz-user-select: text;
     -ms-user-select: text;
     user-select: text;
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
   }
   
   button, .touch-feedback {
@@ -201,6 +204,22 @@
     -ms-user-select: none;
     user-select: none;
     cursor: pointer;
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+  }
+
+  /* Prevent iOS zoom on inputs */
+  @media screen and (-webkit-min-device-pixel-ratio: 0) {
+    select, textarea, input {
+      font-size: 16px !important;
+    }
+  }
+
+  /* Fix iOS Safari viewport issues */
+  @supports (-webkit-touch-callout: none) {
+    .min-h-screen {
+      min-height: -webkit-fill-available;
+    }
   }
 
   /* Touch feedback */

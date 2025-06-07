@@ -522,18 +522,20 @@ export default function NotesApp() {
                 placeholder="在此輸入新筆記..."
                 value={currentNoteText}
                 onChange={(e) => setCurrentNoteText(e.target.value)}
-                className="min-h-[100px] bg-[var(--note-bg-color)] border-[var(--input-border-color)]"
+                className="min-h-[100px] bg-[var(--note-bg-color)] border-[var(--input-border-color)] touch-feedback"
                 rows={4}
+                style={{ fontSize: '16px' }}
               />
               <Input
                 type="text"
                 placeholder="標籤（用逗號分隔）"
                 value={currentTagsInput}
                 onChange={(e) => setCurrentTagsInput(e.target.value)}
-                className="bg-[var(--note-bg-color)] border-[var(--input-border-color)]"
+                className="bg-[var(--note-bg-color)] border-[var(--input-border-color)] touch-feedback"
+                style={{ fontSize: '16px' }}
               />
               <div className="flex justify-end">
-                <Button type="submit" className="min-touch-target">
+                <Button type="submit" className="min-touch-target touch-feedback">
                   <Plus className="h-4 w-4 mr-2" />
                   新增筆記
                 </Button>
