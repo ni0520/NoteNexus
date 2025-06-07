@@ -411,17 +411,17 @@ export default function NotesApp() {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--bg-color)] text-[var(--text-color)] theme-transition">
+    <div className="min-h-screen min-h-[calc(var(--vh,1vh)*100)] bg-[var(--bg-color)] text-[var(--text-color)] theme-transition flex flex-col">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-[var(--card-bg-color)] shadow-sm safe-area-top">
+      <header className="sticky top-0 z-50 bg-[var(--card-bg-color)] shadow-sm safe-area-top flex-shrink-0">
         <div className="max-w-4xl mx-auto px-4 py-3 safe-area-left safe-area-right">
           <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-[var(--header-text-color)]">
+            <h1 className="text-xl sm:text-2xl font-bold text-[var(--header-text-color)]">
               小筆記 Pro
             </h1>
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2 sm:space-x-3">
               <Select value={theme} onValueChange={(value: Theme) => setTheme(value)}>
-                <SelectTrigger className="w-[120px] min-touch-target">
+                <SelectTrigger className="w-[100px] sm:w-[120px] min-touch-target touch-feedback">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -435,7 +435,7 @@ export default function NotesApp() {
               <Button
                 variant="outline"
                 size="icon"
-                className="min-touch-target"
+                className="min-touch-target touch-feedback"
                 onClick={() => setIsSettingsOpen(true)}
               >
                 <Settings className="h-4 w-4" />
@@ -446,7 +446,7 @@ export default function NotesApp() {
       </header>
 
       {/* Main content */}
-      <main className="max-w-4xl mx-auto px-4 py-6 safe-area-left safe-area-right safe-area-bottom">
+      <main className="flex-1 max-w-4xl mx-auto px-4 py-6 safe-area-left safe-area-right safe-area-bottom overflow-y-auto">
         {/* Search and controls */}
         <div className="mb-6 space-y-4">
           {/* Search bar */}
@@ -474,22 +474,24 @@ export default function NotesApp() {
             <Button
               variant="outline"
               size="sm"
-              className="min-touch-target"
+              className="min-touch-target touch-feedback"
               disabled={selectedNoteIds.length === 0}
               onClick={handleToggleHideSelected}
             >
-              <EyeOff className="h-4 w-4 mr-2" />
-              隱藏選中
+              <EyeOff className="h-4 w-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">隱藏選中</span>
+              <span className="sm:hidden">隱藏</span>
             </Button>
             <Button
               variant="outline"
               size="sm"
-              className="min-touch-target"
+              className="min-touch-target touch-feedback"
               disabled={selectedNoteIds.length === 0}
               onClick={handleToggleLockSelected}
             >
-              <Lock className="h-4 w-4 mr-2" />
-              鎖定選中
+              <Lock className="h-4 w-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">鎖定選中</span>
+              <span className="sm:hidden">鎖定</span>
             </Button>
           </div>
 
