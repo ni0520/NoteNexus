@@ -34,6 +34,18 @@ document.addEventListener('touchmove', function(e) {
   if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
     return; // Allow scrolling in input fields
   }
-}, {passive: false});
+}, {passive: true});
+
+// Add specific iOS fixes
+if (isIOS) {
+  // Prevent bounce scrolling
+  document.body.addEventListener('touchstart', function() {}, {passive: true});
+  document.body.addEventListener('touchend', function() {}, {passive: true});
+  document.body.addEventListener('touchmove', function() {}, {passive: true});
+  
+  // Force hardware acceleration
+  document.body.style.transform = 'translateZ(0)';
+  document.body.style.webkitTransform = 'translateZ(0)';
+}
 
 createRoot(document.getElementById("root")!).render(<App />);
