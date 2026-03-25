@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { useNotes } from '@/hooks/useNotes';
 import { useMobile } from '@/hooks/useMobile';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
 interface Tag {
   name: string;
@@ -53,6 +54,8 @@ export default function NotesApp() {
     importData,
     clearAllData
   } = useNotes();
+
+  const { toast } = useToast();
 
   const [currentNoteText, setCurrentNoteText] = useState('');
   const [currentTagsInput, setCurrentTagsInput] = useState('');
@@ -224,8 +227,20 @@ export default function NotesApp() {
 
   const handleDeleteNote = (note: Note) => {
     if (note.isLocked) {
-      setPendingAction({ type: 'delete', noteId: note.id });
-      setShowPasswordPrompt(true);
+      toast({
+        title: '無法刪除',
+        description: '此筆記已上鎖，請先解鎖後才能刪除。',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (note.isHidden) {
+      toast({
+        title: '無法刪除',
+        description: '此筆記已隱藏，請先取消隱藏後才能刪除。',
+        variant: 'destructive',
+      });
       return;
     }
 
@@ -719,9 +734,12 @@ export default function NotesApp() {
                               )}
                             </Button>
                             <Button
-                              variant="destructive"
+                              variant={note.isLocked || note.isHidden ? 'outline' : 'destructive'}
                               size="sm"
-                              className="min-touch-target flex-1 min-w-[80px]"
+                              className={cn(
+                                'min-touch-target flex-1 min-w-[80px]',
+                                (note.isLocked || note.isHidden) && 'opacity-40 cursor-not-allowed'
+                              )}
                               onClick={() => handleDeleteNote(note)}
                             >
                               <Trash2 className="h-4 w-4 mr-1" />
