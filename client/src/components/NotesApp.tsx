@@ -380,8 +380,8 @@ export default function NotesApp() {
     setConfirmPasswordInput('');
   };
 
-  const handleSelectAll = (checked: boolean) => {
-    if (checked) {
+  const handleSelectAll = (checked: boolean | 'indeterminate') => {
+    if (checked === true) {
       setSelectedNoteIds(filteredAndSortedNotes.map(note => note.id));
     } else {
       setSelectedNoteIds([]);
@@ -610,59 +610,67 @@ export default function NotesApp() {
         )}
 
         {/* Controls bar */}
-        <div className="flex flex-wrap gap-2 items-center mb-4">
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="selectAll"
-              checked={allVisible}
-              onCheckedChange={handleSelectAll}
-            />
-            <label htmlFor="selectAll" className="text-sm cursor-pointer select-none">全選</label>
+        <div className="space-y-2 mb-4">
+          <div className="flex flex-wrap gap-2 items-center">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="selectAll"
+                checked={allVisible}
+                onCheckedChange={handleSelectAll}
+              />
+              <label htmlFor="selectAll" className="text-sm cursor-pointer select-none">
+                全選{selectedNoteIds.length > 0 && ` (${selectedNoteIds.length})`}
+              </label>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="min-touch-target touch-feedback"
+              disabled={selectedNoteIds.length === 0}
+              onClick={handleToggleHideSelected}
+            >
+              <EyeOff className="h-4 w-4 mr-1" />
+              隱藏選中
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="min-touch-target touch-feedback"
+              disabled={selectedNoteIds.length === 0}
+              onClick={handleToggleLockSelected}
+            >
+              <Lock className="h-4 w-4 mr-1" />
+              鎖定選中
+            </Button>
+            <Button
+              variant={showHiddenNotes ? 'outline' : 'secondary'}
+              size="sm"
+              className="min-touch-target touch-feedback"
+              onClick={() => setShowHiddenNotes(!showHiddenNotes)}
+              title={showHiddenNotes ? '點擊隱藏已隱藏的筆記' : '點擊顯示已隱藏的筆記'}
+            >
+              {showHiddenNotes
+                ? <><Eye className="h-4 w-4 mr-1" />含隱藏筆記</>
+                : <><EyeOff className="h-4 w-4 mr-1" />不含隱藏</>
+              }
+            </Button>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="min-touch-target touch-feedback"
-            disabled={selectedNoteIds.length === 0}
-            onClick={handleToggleHideSelected}
-          >
-            <EyeOff className="h-4 w-4 mr-1" />
-            <span className="hidden sm:inline">隱藏選中</span>
-            <span className="sm:hidden">隱藏</span>
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="min-touch-target touch-feedback"
-            disabled={selectedNoteIds.length === 0}
-            onClick={handleToggleLockSelected}
-          >
-            <Lock className="h-4 w-4 mr-1" />
-            <span className="hidden sm:inline">鎖定選中</span>
-            <span className="sm:hidden">鎖定</span>
-          </Button>
-          <Button
-            variant={showHiddenNotes ? 'outline' : 'secondary'}
-            size="sm"
-            className="min-touch-target touch-feedback ml-auto"
-            onClick={() => setShowHiddenNotes(!showHiddenNotes)}
-          >
-            {showHiddenNotes ? <Eye className="h-4 w-4 mr-1" /> : <EyeOff className="h-4 w-4 mr-1" />}
-            {showHiddenNotes ? '顯示隱藏' : '隱藏中'}
-          </Button>
-          <Select value={sortOrder} onValueChange={(value: SortOrder) => setSortOrder(value)}>
-            <SelectTrigger className="w-[160px] sm:w-[190px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="createdAt-desc">建立時間（新→舊）</SelectItem>
-              <SelectItem value="createdAt-asc">建立時間（舊→新）</SelectItem>
-              <SelectItem value="updatedAt-desc">更新時間（新→舊）</SelectItem>
-              <SelectItem value="updatedAt-asc">更新時間（舊→新）</SelectItem>
-              <SelectItem value="text-asc">內容（A→Z）</SelectItem>
-              <SelectItem value="text-desc">內容（Z→A）</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500 whitespace-nowrap">排序：</span>
+            <Select value={sortOrder} onValueChange={(value: SortOrder) => setSortOrder(value)}>
+              <SelectTrigger className="flex-1 max-w-[220px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="createdAt-desc">建立時間（新→舊）</SelectItem>
+                <SelectItem value="createdAt-asc">建立時間（舊→新）</SelectItem>
+                <SelectItem value="updatedAt-desc">更新時間（新→舊）</SelectItem>
+                <SelectItem value="updatedAt-asc">更新時間（舊→新）</SelectItem>
+                <SelectItem value="text-asc">內容（A→Z）</SelectItem>
+                <SelectItem value="text-desc">內容（Z→A）</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {/* Add new note */}
@@ -747,7 +755,11 @@ export default function NotesApp() {
               return (
                 <Card
                   key={note.id}
-                  className={cn('note-transition border', note.isHidden && 'opacity-60')}
+                  className={cn(
+                    'note-transition border',
+                    !hasColor && 'bg-[var(--note-bg-color)]',
+                    note.isHidden && 'opacity-60'
+                  )}
                   style={hasColor ? { backgroundColor: note.color! } : {}}
                 >
                   <CardContent className="p-4">
@@ -900,8 +912,9 @@ export default function NotesApp() {
                             )}
 
                             {/* Secondary icon actions */}
-                            <div className="flex items-center gap-1 mb-2">
+                            <div className="flex items-center gap-1 mb-2 pb-2 border-b border-black/5">
                               <button
+                                aria-label={note.isPinned ? '取消置頂' : '置頂此筆記'}
                                 title={note.isPinned ? '取消置頂' : '置頂'}
                                 onClick={() => togglePinNote(note.id)}
                                 className={cn(
@@ -914,6 +927,7 @@ export default function NotesApp() {
                                 {note.isPinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
                               </button>
                               <button
+                                aria-label="複製筆記內容到剪貼簿"
                                 title="複製內容"
                                 onClick={() => handleCopyNote(note.text)}
                                 className="p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors min-w-[36px] min-h-[36px] flex items-center justify-center"
@@ -921,6 +935,7 @@ export default function NotesApp() {
                                 <Copy className="h-4 w-4" />
                               </button>
                               <button
+                                aria-label={colorPickerNoteId === note.id ? '關閉顏色選擇器' : '選擇筆記顏色'}
                                 title={colorPickerNoteId === note.id ? '關閉顏色' : '選擇顏色'}
                                 onClick={() => setColorPickerNoteId(colorPickerNoteId === note.id ? null : note.id)}
                                 className={cn(
@@ -932,10 +947,20 @@ export default function NotesApp() {
                               >
                                 <Palette className="h-4 w-4" />
                               </button>
+                              {note.color && (
+                                <button
+                                  aria-label="移除筆記顏色"
+                                  title="移除顏色"
+                                  onClick={() => updateNoteColor(note.id, '')}
+                                  className="p-2 rounded-md text-gray-400 hover:text-red-500 hover:bg-gray-100 transition-colors min-w-[36px] min-h-[36px] flex items-center justify-center"
+                                >
+                                  <X className="h-4 w-4" />
+                                </button>
+                              )}
                             </div>
 
                             {/* Primary action buttons */}
-                            <div className="flex flex-wrap gap-2">
+                            <div className="flex flex-wrap gap-2 pt-1">
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -964,7 +989,7 @@ export default function NotesApp() {
                                 onClick={() => toggleHideNote(note.id)}
                               >
                                 {note.isHidden
-                                  ? <><Eye className="h-4 w-4 mr-1" />顯示</>
+                                  ? <><Eye className="h-4 w-4 mr-1" />取消隱藏</>
                                   : <><EyeOff className="h-4 w-4 mr-1" />隱藏</>
                                 }
                               </Button>
@@ -974,8 +999,9 @@ export default function NotesApp() {
                                 className="min-touch-target flex-1 min-w-[72px]"
                                 onClick={() => handleDuplicateNote(note)}
                                 disabled={note.isLocked}
+                                title="建立此筆記的副本"
                               >
-                                複製筆記
+                                建立副本
                               </Button>
                               <Button
                                 variant={note.isLocked || note.isHidden ? 'outline' : 'destructive'}
