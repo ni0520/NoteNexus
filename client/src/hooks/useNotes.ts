@@ -13,6 +13,8 @@ interface Note {
   updatedAt?: Date;
   isLocked?: boolean;
   isHidden?: boolean;
+  isPinned?: boolean;
+  color?: string;
 }
 
 interface NotesData {
@@ -29,7 +31,6 @@ interface NotesData {
 export function useNotes() {
   const [notes, setNotes] = useState<Note[]>([]);
 
-  // Load notes from localStorage on mount
   useEffect(() => {
     const storedNotes = localStorage.getItem('notes-app-notes');
     if (storedNotes) {
@@ -41,6 +42,8 @@ export function useNotes() {
           tags: Array.isArray(note.tags) ? note.tags : [],
           isLocked: note.isLocked || false,
           isHidden: note.isHidden || false,
+          isPinned: note.isPinned || false,
+          color: note.color || '',
         }));
         setNotes(parsedNotes);
       } catch (error) {
@@ -50,7 +53,6 @@ export function useNotes() {
     }
   }, []);
 
-  // Save notes to localStorage whenever notes change
   useEffect(() => {
     localStorage.setItem('notes-app-notes', JSON.stringify(notes));
   }, [notes]);
@@ -64,6 +66,8 @@ export function useNotes() {
       updatedAt: new Date(),
       isLocked: false,
       isHidden: false,
+      isPinned: false,
+      color: '',
     };
     setNotes(prevNotes => [newNote, ...prevNotes]);
   }, []);
@@ -71,9 +75,7 @@ export function useNotes() {
   const updateNote = useCallback((id: string, text: string, tags: Tag[] = []) => {
     setNotes(prevNotes =>
       prevNotes.map(note =>
-        note.id === id
-          ? { ...note, text, tags, updatedAt: new Date() }
-          : note
+        note.id === id ? { ...note, text, tags, updatedAt: new Date() } : note
       )
     );
   }, []);
@@ -85,9 +87,7 @@ export function useNotes() {
   const toggleLockNote = useCallback((id: string) => {
     setNotes(prevNotes =>
       prevNotes.map(note =>
-        note.id === id
-          ? { ...note, isLocked: !note.isLocked, updatedAt: new Date() }
-          : note
+        note.id === id ? { ...note, isLocked: !note.isLocked, updatedAt: new Date() } : note
       )
     );
   }, []);
@@ -95,9 +95,42 @@ export function useNotes() {
   const toggleHideNote = useCallback((id: string) => {
     setNotes(prevNotes =>
       prevNotes.map(note =>
-        note.id === id
-          ? { ...note, isHidden: !note.isHidden, updatedAt: new Date() }
-          : note
+        note.id === id ? { ...note, isHidden: !note.isHidden, updatedAt: new Date() } : note
+      )
+    );
+  }, []);
+
+  const togglePinNote = useCallback((id: string) => {
+    setNotes(prevNotes =>
+      prevNotes.map(note =>
+        note.id === id ? { ...note, isPinned: !note.isPinned, updatedAt: new Date() } : note
+      )
+    );
+  }, []);
+
+  const duplicateNote = useCallback((id: string) => {
+    setNotes(prevNotes => {
+      const note = prevNotes.find(n => n.id === id);
+      if (!note) return prevNotes;
+      const newNote: Note = {
+        ...note,
+        id: (Date.now() + 1).toString(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        isLocked: false,
+        isPinned: false,
+      };
+      const idx = prevNotes.findIndex(n => n.id === id);
+      const next = [...prevNotes];
+      next.splice(idx + 1, 0, newNote);
+      return next;
+    });
+  }, []);
+
+  const updateNoteColor = useCallback((id: string, color: string) => {
+    setNotes(prevNotes =>
+      prevNotes.map(note =>
+        note.id === id ? { ...note, color } : note
       )
     );
   }, []);
@@ -105,7 +138,6 @@ export function useNotes() {
   const exportData = useCallback((): NotesData => {
     const allTagsData = localStorage.getItem('notes-all-tags');
     const allTags = allTagsData ? new Map(JSON.parse(allTagsData)) : new Map();
-    
     return {
       notes,
       allTags,
@@ -127,18 +159,17 @@ export function useNotes() {
         tags: Array.isArray(note.tags) ? note.tags : [],
         isLocked: note.isLocked || false,
         isHidden: note.isHidden || false,
+        isPinned: note.isPinned || false,
+        color: note.color || '',
       }));
       setNotes(importedNotes);
     }
-
     if (data.allTags) {
       localStorage.setItem('notes-all-tags', JSON.stringify(Array.from(data.allTags.entries())));
     }
-
     if (data.globalPassword) {
       localStorage.setItem('notes-global-password', data.globalPassword);
     }
-
     if (data.settings) {
       localStorage.setItem('notes-delete-confirmation', JSON.stringify(data.settings.requireDeleteConfirmation));
       localStorage.setItem('notes-theme', data.settings.theme);
@@ -163,6 +194,9 @@ export function useNotes() {
     deleteNote,
     toggleLockNote,
     toggleHideNote,
+    togglePinNote,
+    duplicateNote,
+    updateNoteColor,
     exportData,
     importData,
     clearAllData,
