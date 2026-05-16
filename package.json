@@ -11,6 +11,7 @@
     "db:push": "drizzle-kit push"
   },
   "dependencies": {
+    "@esbuild-kit/core-utils": "^3.3.2",
     "@hookform/resolvers": "^3.10.0",
     "@jridgewell/trace-mapping": "^0.3.25",
     "@neondatabase/serverless": "^0.10.4",
@@ -106,6 +107,9 @@
   },
   "overrides": {
     "vite": {
+      "esbuild": "^0.25.0"
+    },
+    "@esbuild-kit/core-utils": {
       "esbuild": "^0.25.0"
     }
   }
