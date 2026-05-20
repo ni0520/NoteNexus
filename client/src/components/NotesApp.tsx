@@ -103,7 +103,6 @@ export default function NotesApp() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [noteToDelete, setNoteToDelete] = useState<Note | null>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
-  const [allTags, setAllTags] = useState<Map<string, string>>(new Map());
   const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [colorPickerNoteId, setColorPickerNoteId] = useState<string | null>(null);
   const [showHiddenNotes, setShowHiddenNotes] = useState(true);
@@ -123,14 +122,6 @@ export default function NotesApp() {
     const savedSortOrder = localStorage.getItem('notes-sort-order') as SortOrder;
     if (savedSortOrder) setSortOrder(savedSortOrder);
 
-    const savedTags = localStorage.getItem('notes-all-tags');
-    if (savedTags) {
-      try {
-        setAllTags(new Map(JSON.parse(savedTags)));
-      } catch (error) {
-        console.error('Failed to parse tags:', error);
-      }
-    }
   }, []);
 
   useEffect(() => {
@@ -159,10 +150,6 @@ export default function NotesApp() {
     localStorage.setItem('notes-sort-order', sortOrder);
   }, [sortOrder]);
 
-  useEffect(() => {
-    localStorage.setItem('notes-all-tags', JSON.stringify(Array.from(allTags.entries())));
-  }, [allTags]);
-
   // Keyboard shortcut: Escape to cancel editing
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -184,23 +171,28 @@ export default function NotesApp() {
     return PREDEFINED_TAG_COLORS[usedColors.size % PREDEFINED_TAG_COLORS.length];
   }, []);
 
+  const allTags = useMemo(() => {
+    const map = new Map<string, string>();
+    notes.forEach(note => note.tags.forEach(tag => map.set(tag.name, tag.color)));
+    return map;
+  }, [notes]);
+
+  const allTagNames = useMemo(() => {
+    return Array.from(allTags.keys()).sort();
+  }, [allTags]);
+
   const processTagsInput = useCallback((tagsInput: string): Tag[] => {
     const tagNames = tagsInput.split(',').map(tag => tag.trim()).filter(tag => tag !== '');
-    const newAllTags = new Map(allTags);
-    let changed = false;
+    const tempMap = new Map(allTags);
 
-    const processedTags = tagNames.map(name => {
-      let color = newAllTags.get(name);
+    return tagNames.map(name => {
+      let color = tempMap.get(name);
       if (!color) {
-        color = getNextColor(Array.from(newAllTags.values()));
-        newAllTags.set(name, color);
-        changed = true;
+        color = getNextColor(Array.from(tempMap.values()));
+        tempMap.set(name, color);
       }
       return { name, color };
     });
-
-    if (changed) setAllTags(newAllTags);
-    return processedTags;
   }, [allTags, getNextColor]);
 
   const formatDate = (date: Date): string => {
@@ -226,12 +218,6 @@ export default function NotesApp() {
     if (days < 7) return `${days} 天前`;
     return formatDate(new Date(date));
   };
-
-  const allTagNames = useMemo(() => {
-    const tagSet = new Set<string>();
-    notes.forEach(note => note.tags.forEach(tag => tagSet.add(tag.name)));
-    return Array.from(tagSet).sort();
-  }, [notes]);
 
   const stats = useMemo(() => ({
     total: notes.length,
@@ -494,7 +480,6 @@ export default function NotesApp() {
   const confirmClearAllData = () => {
     clearAllData();
     setSelectedNoteIds([]);
-    setAllTags(new Map());
     setTagFilter(null);
     setShowClearConfirm(false);
     setIsSettingsOpen(false);
