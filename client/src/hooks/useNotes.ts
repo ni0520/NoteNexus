@@ -1,23 +1,37 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback } from 'react';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { queryClient, apiRequest } from '@/lib/queryClient';
 
 interface Tag {
   name: string;
   color: string;
 }
 
-interface Note {
+interface ApiNote {
+  id: number;
+  text: string;
+  tags: Tag[];
+  createdAt: string;
+  updatedAt: string;
+  isLocked: boolean;
+  isHidden: boolean;
+  isPinned: boolean;
+  color: string;
+}
+
+export interface Note {
   id: string;
   text: string;
   tags: Tag[];
   createdAt: Date;
-  updatedAt?: Date;
-  isLocked?: boolean;
-  isHidden?: boolean;
-  isPinned?: boolean;
-  color?: string;
+  updatedAt: Date;
+  isLocked: boolean;
+  isHidden: boolean;
+  isPinned: boolean;
+  color: string;
 }
 
-interface NotesData {
+export interface NotesData {
   notes: Note[];
   allTags: Map<string, string>;
   globalPassword?: string;
@@ -28,119 +42,125 @@ interface NotesData {
   };
 }
 
+const toNote = (n: ApiNote): Note => ({
+  id: n.id.toString(),
+  text: n.text,
+  tags: n.tags ?? [],
+  createdAt: new Date(n.createdAt),
+  updatedAt: new Date(n.updatedAt),
+  isLocked: n.isLocked,
+  isHidden: n.isHidden,
+  isPinned: n.isPinned,
+  color: n.color ?? '',
+});
+
+const NOTES_KEY = ['/api/notes'];
+
 export function useNotes() {
-  const [notes, setNotes] = useState<Note[]>([]);
+  const { data: rawNotes = [] } = useQuery<ApiNote[]>({
+    queryKey: NOTES_KEY,
+  });
 
-  useEffect(() => {
-    const storedNotes = localStorage.getItem('notes-app-notes');
-    if (storedNotes) {
-      try {
-        const parsedNotes: Note[] = JSON.parse(storedNotes).map((note: any) => ({
-          ...note,
-          createdAt: new Date(note.createdAt),
-          updatedAt: note.updatedAt ? new Date(note.updatedAt) : undefined,
-          tags: Array.isArray(note.tags) ? note.tags : [],
-          isLocked: note.isLocked || false,
-          isHidden: note.isHidden || false,
-          isPinned: note.isPinned || false,
-          color: note.color || '',
-        }));
-        setNotes(parsedNotes);
-      } catch (error) {
-        console.error('Failed to parse notes:', error);
-        setNotes([]);
-      }
-    }
-  }, []);
+  const notes: Note[] = rawNotes.map(toNote);
 
-  useEffect(() => {
-    localStorage.setItem('notes-app-notes', JSON.stringify(notes));
-  }, [notes]);
+  const addMutation = useMutation({
+    mutationFn: async (data: { text: string; tags: Tag[] }) => {
+      const res = await apiRequest('POST', '/api/notes', data);
+      return res.json() as Promise<ApiNote>;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: NOTES_KEY }),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, text, tags }: { id: string; text: string; tags: Tag[] }) => {
+      const res = await apiRequest('PATCH', `/api/notes/${id}`, { text, tags });
+      return res.json() as Promise<ApiNote>;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: NOTES_KEY }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => apiRequest('DELETE', `/api/notes/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: NOTES_KEY }),
+  });
+
+  const patchMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Record<string, unknown> }) => {
+      const res = await apiRequest('PATCH', `/api/notes/${id}`, data);
+      return res.json() as Promise<ApiNote>;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: NOTES_KEY }),
+  });
+
+  const clearMutation = useMutation({
+    mutationFn: () => apiRequest('DELETE', '/api/notes'),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: NOTES_KEY }),
+  });
+
+  const importMutation = useMutation({
+    mutationFn: async (importNotes: Note[]) => {
+      const payload = importNotes.map(n => ({
+        text: n.text,
+        tags: n.tags ?? [],
+        isLocked: n.isLocked ?? false,
+        isHidden: n.isHidden ?? false,
+        isPinned: n.isPinned ?? false,
+        color: n.color ?? '',
+        createdAt: n.createdAt,
+        updatedAt: n.updatedAt,
+      }));
+      const res = await apiRequest('POST', '/api/notes/import', payload);
+      return res.json() as Promise<ApiNote[]>;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: NOTES_KEY }),
+  });
 
   const addNote = useCallback((text: string, tags: Tag[] = []) => {
-    const newNote: Note = {
-      id: Date.now().toString(),
-      text,
-      tags,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      isLocked: false,
-      isHidden: false,
-      isPinned: false,
-      color: '',
-    };
-    setNotes(prevNotes => [newNote, ...prevNotes]);
-  }, []);
+    addMutation.mutate({ text, tags });
+  }, [addMutation]);
 
   const updateNote = useCallback((id: string, text: string, tags: Tag[] = []) => {
-    setNotes(prevNotes =>
-      prevNotes.map(note =>
-        note.id === id ? { ...note, text, tags, updatedAt: new Date() } : note
-      )
-    );
-  }, []);
+    updateMutation.mutate({ id, text, tags });
+  }, [updateMutation]);
 
   const deleteNote = useCallback((id: string) => {
-    setNotes(prevNotes => prevNotes.filter(note => note.id !== id));
-  }, []);
+    deleteMutation.mutate(id);
+  }, [deleteMutation]);
 
   const toggleLockNote = useCallback((id: string) => {
-    setNotes(prevNotes =>
-      prevNotes.map(note =>
-        note.id === id ? { ...note, isLocked: !note.isLocked, updatedAt: new Date() } : note
-      )
-    );
-  }, []);
+    const note = notes.find(n => n.id === id);
+    if (!note) return;
+    patchMutation.mutate({ id, data: { isLocked: !note.isLocked } });
+  }, [notes, patchMutation]);
 
   const toggleHideNote = useCallback((id: string) => {
-    setNotes(prevNotes =>
-      prevNotes.map(note =>
-        note.id === id ? { ...note, isHidden: !note.isHidden, updatedAt: new Date() } : note
-      )
-    );
-  }, []);
+    const note = notes.find(n => n.id === id);
+    if (!note) return;
+    patchMutation.mutate({ id, data: { isHidden: !note.isHidden } });
+  }, [notes, patchMutation]);
 
   const togglePinNote = useCallback((id: string) => {
-    setNotes(prevNotes =>
-      prevNotes.map(note =>
-        note.id === id ? { ...note, isPinned: !note.isPinned, updatedAt: new Date() } : note
-      )
-    );
-  }, []);
+    const note = notes.find(n => n.id === id);
+    if (!note) return;
+    patchMutation.mutate({ id, data: { isPinned: !note.isPinned } });
+  }, [notes, patchMutation]);
 
   const duplicateNote = useCallback((id: string) => {
-    setNotes(prevNotes => {
-      const note = prevNotes.find(n => n.id === id);
-      if (!note) return prevNotes;
-      const newNote: Note = {
-        ...note,
-        id: (Date.now() + 1).toString(),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        isLocked: false,
-        isPinned: false,
-      };
-      const idx = prevNotes.findIndex(n => n.id === id);
-      const next = [...prevNotes];
-      next.splice(idx + 1, 0, newNote);
-      return next;
-    });
-  }, []);
+    const note = notes.find(n => n.id === id);
+    if (!note) return;
+    addMutation.mutate({ text: note.text, tags: note.tags });
+  }, [notes, addMutation]);
 
   const updateNoteColor = useCallback((id: string, color: string) => {
-    setNotes(prevNotes =>
-      prevNotes.map(note =>
-        note.id === id ? { ...note, color } : note
-      )
-    );
-  }, []);
+    patchMutation.mutate({ id, data: { color } });
+  }, [patchMutation]);
 
   const exportData = useCallback((): NotesData => {
-    const allTagsData = localStorage.getItem('notes-all-tags');
-    const allTags = allTagsData ? new Map(JSON.parse(allTagsData)) : new Map();
+    const allTagsMap = new Map<string, string>();
+    notes.forEach(note => note.tags.forEach(tag => allTagsMap.set(tag.name, tag.color)));
     return {
       notes,
-      allTags,
+      allTags: allTagsMap,
       globalPassword: localStorage.getItem('notes-global-password') || undefined,
       settings: {
         requireDeleteConfirmation: JSON.parse(localStorage.getItem('notes-delete-confirmation') || 'true'),
@@ -152,20 +172,7 @@ export function useNotes() {
 
   const importData = useCallback((data: NotesData) => {
     if (data.notes && Array.isArray(data.notes)) {
-      const importedNotes = data.notes.map(note => ({
-        ...note,
-        createdAt: new Date(note.createdAt),
-        updatedAt: note.updatedAt ? new Date(note.updatedAt) : undefined,
-        tags: Array.isArray(note.tags) ? note.tags : [],
-        isLocked: note.isLocked || false,
-        isHidden: note.isHidden || false,
-        isPinned: note.isPinned || false,
-        color: note.color || '',
-      }));
-      setNotes(importedNotes);
-    }
-    if (data.allTags) {
-      localStorage.setItem('notes-all-tags', JSON.stringify(Array.from(data.allTags.entries())));
+      importMutation.mutate(data.notes);
     }
     if (data.globalPassword) {
       localStorage.setItem('notes-global-password', data.globalPassword);
@@ -175,17 +182,17 @@ export function useNotes() {
       localStorage.setItem('notes-theme', data.settings.theme);
       localStorage.setItem('notes-sort-order', data.settings.sortOrder);
     }
-  }, []);
+  }, [importMutation]);
 
   const clearAllData = useCallback(() => {
-    setNotes([]);
-    localStorage.removeItem('notes-app-notes');
-    localStorage.removeItem('notes-all-tags');
+    clearMutation.mutate();
     localStorage.removeItem('notes-global-password');
     localStorage.removeItem('notes-delete-confirmation');
     localStorage.removeItem('notes-theme');
     localStorage.removeItem('notes-sort-order');
-  }, []);
+    localStorage.removeItem('notes-all-tags');
+    localStorage.removeItem('notes-app-notes');
+  }, [clearMutation]);
 
   return {
     notes,
