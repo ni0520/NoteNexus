@@ -1,6 +1,6 @@
 import { pgTable, text, serial, boolean, timestamp, jsonb, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
-import { z } from "zod";
+import { z } from "zod/v4";
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -17,6 +17,7 @@ export type User = typeof users.$inferSelect;
 
 export const notes = pgTable("notes", {
   id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   text: text("text").notNull(),
   tags: jsonb("tags").$type<Array<{ name: string; color: string }>>().notNull().default([]),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -40,6 +41,7 @@ export type BackupNote = {
 
 export const noteBackups = pgTable("note_backups", {
   id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   noteCount: integer("note_count").notNull().default(0),
   data: jsonb("data").$type<BackupNote[]>().notNull(),

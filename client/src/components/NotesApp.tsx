@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   Search, Settings, Plus, Lock, Unlock, Edit, Trash2, Eye, EyeOff,
   Download, Upload, X, Pin, PinOff, Copy, Palette, ChevronDown, ChevronUp,
-  Cloud, CloudUpload, RotateCcw
+  Cloud, CloudUpload, RotateCcw, LogOut
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { useNotes } from '@/hooks/useNotes';
 import { useMobile } from '@/hooks/useMobile';
 import { cn } from '@/lib/utils';
+import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 
 interface Tag {
@@ -64,7 +65,12 @@ const NOTE_COLORS = [
 
 const LONG_NOTE_THRESHOLD = 200;
 
-export default function NotesApp() {
+interface NotesAppProps {
+  username: string;
+  onLogout: () => void;
+}
+
+export default function NotesApp({ username, onLogout }: NotesAppProps) {
   const isMobile = useMobile();
   const {
     notes,
@@ -550,6 +556,15 @@ export default function NotesApp() {
 
   const allVisible = filteredAndSortedNotes.length > 0 && filteredAndSortedNotes.every(n => selectedNoteIds.includes(n.id));
 
+  const handleLogout = async () => {
+    try {
+      await apiRequest('POST', '/api/auth/logout');
+      onLogout();
+    } catch {
+      toast({ title: '登出失敗', description: '請稍後再試。', variant: 'destructive' });
+    }
+  };
+
   return (
     <div className="min-h-screen min-h-[calc(var(--vh,1vh)*100)] bg-[var(--bg-color)] text-[var(--text-color)] theme-transition flex flex-col">
       {/* Header */}
@@ -587,6 +602,16 @@ export default function NotesApp() {
                 onClick={() => setIsSettingsOpen(true)}
               >
                 <Settings className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="min-touch-target touch-feedback"
+                onClick={handleLogout}
+                title={`登出 ${username}`}
+                aria-label={`登出 ${username}`}
+              >
+                <LogOut className="h-4 w-4" />
               </Button>
             </div>
           </div>

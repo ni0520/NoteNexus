@@ -1,0 +1,1 @@
+- [Drizzle Session 表](drizzle-session-table.md) — 使用 connect-pg-simple 時，Drizzle push 必須排除 session 表，避免同步時誤刪除登入 Session。
