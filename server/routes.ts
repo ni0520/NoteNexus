@@ -2,10 +2,22 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage, type IStorage } from "./storage";
 import { insertNoteSchema, importNoteSchema, insertUserSchema, type BackupNote } from "@shared/schema";
-import { getUserId, hashPassword, publicUser, regenerateSession, requireAuth, destroySession, verifyPassword } from "./auth";
+import {
+  destroySession,
+  getUserId,
+  hashPassword,
+  INVALID_LOGIN_MESSAGE,
+  LoginRateLimiter,
+  publicUser,
+  regenerateSession,
+  requireAuth,
+  verifyPasswordOrDummy,
+} from "./auth";
 import { z } from "zod/v4";
 
 export async function registerRoutes(app: Express, storageImplementation: IStorage = storage): Promise<Server> {
+  const loginIpLimiter = new LoginRateLimiter({ maxFailures: 20 });
+  const loginAccountLimiter = new LoginRateLimiter();
   const credentialsSchema = z.object({
     username: z.string().trim().min(3).max(40).regex(/^[a-zA-Z0-9_.-]+$/),
     password: z.string().min(8).max(128),
@@ -43,13 +55,31 @@ export async function registerRoutes(app: Express, storageImplementation: IStora
 
   app.post("/api/auth/login", async (req, res) => {
     const parsed = credentialsSchema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ message: "Invalid username or password" });
+    if (!parsed.success) return res.status(400).json({ message: INVALID_LOGIN_MESSAGE });
 
     try {
-      const user = await storageImplementation.getUserByUsername(parsed.data.username.toLowerCase());
-      if (!user || !(await verifyPassword(parsed.data.password, user.password))) {
-        return res.status(401).json({ message: "Invalid username or password" });
+      const username = parsed.data.username.toLowerCase();
+      const sourceKey = req.ip || req.socket.remoteAddress || "unknown";
+      const accountKey = `${sourceKey}:${username}`;
+      const blocked = [loginIpLimiter.check(sourceKey), loginAccountLimiter.check(accountKey)]
+        .filter((result) => !result.allowed)
+        .sort((a, b) => (b.retryAfterSeconds ?? 0) - (a.retryAfterSeconds ?? 0))[0];
+
+      if (blocked) {
+        res.set("Retry-After", String(blocked.retryAfterSeconds ?? 60));
+        return res.status(429).json({ message: INVALID_LOGIN_MESSAGE });
       }
+
+      const user = await storageImplementation.getUserByUsername(username);
+      const passwordMatches = await verifyPasswordOrDummy(parsed.data.password, user?.password);
+      if (!user || !passwordMatches) {
+        loginIpLimiter.recordFailure(sourceKey);
+        loginAccountLimiter.recordFailure(accountKey);
+        return res.status(401).json({ message: INVALID_LOGIN_MESSAGE });
+      }
+
+      loginIpLimiter.reset(sourceKey);
+      loginAccountLimiter.reset(accountKey);
       await regenerateSession(req, user.id);
       res.json(publicUser(user));
     } catch (err) {

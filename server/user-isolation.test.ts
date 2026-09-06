@@ -182,6 +182,13 @@ async function register(client: ApiClient, username: string): Promise<void> {
   await expectStatus(response, 201);
 }
 
+async function login(client: ApiClient, username: string, loginPassword = password): Promise<Response> {
+  return client.request("/api/auth/login", {
+    method: "POST",
+    body: { username, password: loginPassword },
+  });
+}
+
 before(async () => {
   const app = express();
   app.use(express.json());
@@ -366,4 +373,31 @@ test("invalidates the old session cookie after logout", async () => {
   const staleSessionClient = new ApiClient(baseUrl, staleCookie);
   await expectStatus(await staleSessionClient.request("/api/notes"), 401);
   await expectStatus(await staleSessionClient.request("/api/backups"), 401);
+});
+
+test("throttles repeated login failures without revealing account existence", async () => {
+  const username = `throttled-user-${runId}`;
+  const registeredClient = new ApiClient(baseUrl);
+  await register(registeredClient, username);
+
+  const normalLogin = await login(new ApiClient(baseUrl), username);
+  await expectStatus(normalLogin, 200);
+
+  const attacker = new ApiClient(baseUrl);
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    await expectStatus(await login(attacker, username, "wrong-password"), 401);
+  }
+
+  const blockedResponse = await login(attacker, username, "wrong-password");
+  await expectStatus(blockedResponse, 429);
+  assert.equal((await json<{ message: string }>(blockedResponse)).message, "Invalid username or password");
+  assert.ok(blockedResponse.headers.get("retry-after"));
+
+  // A correct password is also rejected while the account-specific cooldown is active.
+  await expectStatus(await login(attacker, username), 429);
+
+  // Unknown accounts use the same generic response and are never identified by the limiter.
+  const unknownResponse = await login(new ApiClient(baseUrl), `missing-user-${runId}`, "wrong-password");
+  await expectStatus(unknownResponse, 401);
+  assert.equal((await json<{ message: string }>(unknownResponse)).message, "Invalid username or password");
 });
