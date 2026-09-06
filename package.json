@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "NODE_ENV=development tsx server/index.ts",
     "test": "NODE_ENV=test tsx --test server/*.test.ts",
+    "test:note-backup": "NODE_ENV=test tsx --test server/note-backup.test.ts",
     "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "start": "NODE_ENV=production node dist/index.js",
     "check": "tsc",

@@ -1,7 +1,13 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage, type IStorage } from "./storage";
-import { insertNoteSchema, importNoteSchema, insertUserSchema, type BackupNote } from "@shared/schema";
+import {
+  createBackupSchema,
+  importNotesSchema,
+  insertNoteSchema,
+  insertUserSchema,
+  type BackupNote,
+} from "@shared/schema";
 import {
   destroySession,
   getUserId,
@@ -156,7 +162,7 @@ export async function registerRoutes(app: Express, storageImplementation: IStora
   });
 
   app.post("/api/notes/import", async (req, res) => {
-    const parsed = z.array(importNoteSchema).safeParse(req.body);
+    const parsed = importNotesSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ message: parsed.error.message });
     }
@@ -178,7 +184,7 @@ export async function registerRoutes(app: Express, storageImplementation: IStora
   });
 
   app.post("/api/backups", async (req, res) => {
-    const parsed = z.object({ notes: z.array(importNoteSchema) }).safeParse(req.body);
+    const parsed = createBackupSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ message: parsed.error.message });
     }
