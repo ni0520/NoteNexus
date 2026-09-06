@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertNoteSchema, importNoteSchema, insertUserSchema, type BackupNote } from "@shared/schema";
 import { getUserId, hashPassword, publicUser, regenerateSession, requireAuth, destroySession, verifyPassword } from "./auth";
-import { z } from "zod";
+import { z } from "zod/v4";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const credentialsSchema = z.object({
