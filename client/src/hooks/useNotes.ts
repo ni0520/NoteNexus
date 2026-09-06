@@ -33,13 +33,19 @@ export interface Note {
 
 export interface NotesData {
   notes: Note[];
-  allTags: Map<string, string>;
+  allTags: Array<{ name: string; color: string }>;
   globalPassword?: string;
   settings?: {
     requireDeleteConfirmation: boolean;
     theme: string;
     sortOrder: string;
   };
+}
+
+export interface CloudBackup {
+  id: number;
+  createdAt: Date;
+  noteCount: number;
 }
 
 const toNote = (n: ApiNote): Note => ({
@@ -55,13 +61,25 @@ const toNote = (n: ApiNote): Note => ({
 });
 
 const NOTES_KEY = ['/api/notes'];
+const BACKUPS_KEY = ['/api/backups'];
 
 export function useNotes() {
   const { data: rawNotes = [] } = useQuery<ApiNote[]>({
     queryKey: NOTES_KEY,
   });
+  const { data: rawBackups = [] } = useQuery<Array<{
+    id: number;
+    createdAt: string;
+    noteCount: number;
+  }>>({
+    queryKey: BACKUPS_KEY,
+  });
 
   const notes: Note[] = rawNotes.map(toNote);
+  const cloudBackups: CloudBackup[] = rawBackups.map((backup) => ({
+    ...backup,
+    createdAt: new Date(backup.createdAt),
+  }));
 
   const addMutation = useMutation({
     mutationFn: async (data: { text: string; tags: Tag[] }) => {
@@ -115,6 +133,36 @@ export function useNotes() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: NOTES_KEY }),
   });
 
+  const createBackupMutation = useMutation({
+    mutationFn: async (data: { notes: Array<{
+      text: string;
+      tags: Tag[];
+      createdAt: string;
+      updatedAt: string;
+      isLocked: boolean;
+      isHidden: boolean;
+      isPinned: boolean;
+      color: string;
+    }> }) => {
+      const res = await apiRequest('POST', '/api/backups', data);
+      return res.json() as Promise<{ id: number; createdAt: string; noteCount: number }>;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: BACKUPS_KEY }),
+  });
+
+  const restoreBackupMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest('POST', `/api/backups/${id}/restore`);
+      return res.json() as Promise<ApiNote[]>;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: NOTES_KEY }),
+  });
+
+  const deleteBackupMutation = useMutation({
+    mutationFn: (id: number) => apiRequest('DELETE', `/api/backups/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: BACKUPS_KEY }),
+  });
+
   const addNote = useCallback((text: string, tags: Tag[] = []) => {
     addMutation.mutate({ text, tags });
   }, [addMutation]);
@@ -160,7 +208,7 @@ export function useNotes() {
     notes.forEach(note => note.tags.forEach(tag => allTagsMap.set(tag.name, tag.color)));
     return {
       notes,
-      allTags: allTagsMap,
+      allTags: Array.from(allTagsMap, ([name, color]) => ({ name, color })),
       globalPassword: localStorage.getItem('notes-global-password') || undefined,
       settings: {
         requireDeleteConfirmation: JSON.parse(localStorage.getItem('notes-delete-confirmation') || 'true'),
@@ -194,6 +242,29 @@ export function useNotes() {
     localStorage.removeItem('notes-app-notes');
   }, [clearMutation]);
 
+  const createCloudBackup = useCallback(async () => {
+    return createBackupMutation.mutateAsync({
+      notes: notes.map((note) => ({
+        text: note.text,
+        tags: note.tags,
+        createdAt: note.createdAt.toISOString(),
+        updatedAt: note.updatedAt.toISOString(),
+        isLocked: note.isLocked,
+        isHidden: note.isHidden,
+        isPinned: note.isPinned,
+        color: note.color,
+      })),
+    });
+  }, [createBackupMutation, notes]);
+
+  const restoreCloudBackup = useCallback(async (id: number) => {
+    return restoreBackupMutation.mutateAsync(id);
+  }, [restoreBackupMutation]);
+
+  const deleteCloudBackup = useCallback(async (id: number) => {
+    return deleteBackupMutation.mutateAsync(id);
+  }, [deleteBackupMutation]);
+
   return {
     notes,
     addNote,
@@ -207,5 +278,9 @@ export function useNotes() {
     exportData,
     importData,
     clearAllData,
+    cloudBackups,
+    createCloudBackup,
+    restoreCloudBackup,
+    deleteCloudBackup,
   };
 }

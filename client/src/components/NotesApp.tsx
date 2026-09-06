@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Search, Settings, Plus, Lock, Unlock, Edit, Trash2, Eye, EyeOff,
-  Download, Upload, X, Pin, PinOff, Copy, Palette, ChevronDown, ChevronUp
+  Download, Upload, X, Pin, PinOff, Copy, Palette, ChevronDown, ChevronUp,
+  Cloud, CloudUpload, RotateCcw
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -77,11 +78,16 @@ export default function NotesApp() {
     updateNoteColor,
     exportData,
     importData,
-    clearAllData
+    clearAllData,
+    cloudBackups,
+    createCloudBackup,
+    restoreCloudBackup,
+    deleteCloudBackup
   } = useNotes();
 
   const { toast } = useToast();
   const newNoteRef = useRef<HTMLTextAreaElement>(null);
+  const notesListRef = useRef<HTMLDivElement>(null);
 
   const [currentNoteText, setCurrentNoteText] = useState('');
   const [currentTagsInput, setCurrentTagsInput] = useState('');
@@ -300,13 +306,31 @@ export default function NotesApp() {
       return;
     }
     deleteNote(note.id);
-    setSelectedNoteIds(prev => prev.filter(id => id !== note.id));
+    finishDelete(note.id);
+  };
+
+  const finishDelete = (noteId: string) => {
+    setSelectedNoteIds(prev => prev.filter(id => id !== noteId));
+    setExpandedNoteIds(prev => {
+      const next = new Set(prev);
+      next.delete(noteId);
+      return next;
+    });
+    if (editingNoteId === noteId) {
+      setEditingNoteId(null);
+      setEditingNoteText('');
+      setEditingTagsInput('');
+    }
+    if (colorPickerNoteId === noteId) setColorPickerNoteId(null);
+    requestAnimationFrame(() => {
+      notesListRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
   };
 
   const confirmDeleteNote = () => {
     if (noteToDelete) {
       deleteNote(noteToDelete.id);
-      setSelectedNoteIds(prev => prev.filter(id => id !== noteToDelete.id));
+      finishDelete(noteToDelete.id);
       toast({ title: '已刪除', description: '筆記已刪除。' });
     }
     setShowDeleteConfirm(false);
@@ -475,6 +499,44 @@ export default function NotesApp() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     toast({ title: '匯出成功', description: '資料已下載至您的裝置。' });
+  };
+
+  const handleCreateCloudBackup = async () => {
+    try {
+      await createCloudBackup();
+      toast({ title: '雲端備份完成', description: `已備份 ${notes.length} 筆筆記。` });
+    } catch {
+      toast({ title: '雲端備份失敗', description: '請稍後再試，並確認伺服器資料庫正常運作。', variant: 'destructive' });
+    }
+  };
+
+  const handleRestoreCloudBackup = async (backupId: number) => {
+    const backup = cloudBackups.find(item => item.id === backupId);
+    if (!backup) return;
+    if (!window.confirm(`確定要還原 ${formatDate(backup.createdAt)} 的 ${backup.noteCount} 筆筆記嗎？目前筆記會被取代。`)) {
+      return;
+    }
+    try {
+      await restoreCloudBackup(backupId);
+      setSelectedNoteIds([]);
+      setEditingNoteId(null);
+      setExpandedNoteIds(new Set());
+      setTagFilter(null);
+      setSearchTerm('');
+      toast({ title: '雲端備份已還原', description: `已還原 ${backup.noteCount} 筆筆記。` });
+    } catch {
+      toast({ title: '還原失敗', description: '無法還原這份雲端備份。', variant: 'destructive' });
+    }
+  };
+
+  const handleDeleteCloudBackup = async (backupId: number) => {
+    if (!window.confirm('確定要刪除這份雲端備份嗎？此操作無法復原。')) return;
+    try {
+      await deleteCloudBackup(backupId);
+      toast({ title: '雲端備份已刪除' });
+    } catch {
+      toast({ title: '刪除備份失敗', description: '無法刪除這份雲端備份。', variant: 'destructive' });
+    }
   };
 
   const confirmClearAllData = () => {
@@ -717,7 +779,7 @@ export default function NotesApp() {
         )}
 
         {/* Notes list */}
-        <div className="space-y-4">
+        <div ref={notesListRef} className="space-y-4">
           {filteredAndSortedNotes.length === 0 ? (
             <div className="text-center py-12">
               <div className="text-6xl mb-4">📝</div>
@@ -1107,6 +1169,67 @@ export default function NotesApp() {
                   匯出備份（JSON）
                 </Button>
               </div>
+            </div>
+
+            {/* Cloud backups */}
+            <div className="border-t pt-6">
+              <h3 className="font-medium mb-2 flex items-center gap-2">
+                <Cloud className="h-4 w-4" />
+                雲端備份
+              </h3>
+              <p className="text-xs text-gray-500 mb-3">
+                備份會儲存在目前應用程式的雲端資料庫，不會上傳全域鎖定密碼與顯示設定。
+              </p>
+              <Button
+                className="w-full min-touch-target mb-3"
+                onClick={handleCreateCloudBackup}
+              >
+                <CloudUpload className="h-4 w-4 mr-2" />
+                立即備份至雲端
+              </Button>
+              {cloudBackups.length === 0 ? (
+                <p className="text-sm text-gray-500 text-center py-2">尚未建立雲端備份</p>
+              ) : (
+                <div className="space-y-2">
+                  {[...cloudBackups].reverse().slice(0, 5).map((backup) => (
+                    <div
+                      key={backup.id}
+                      className="flex items-center justify-between gap-2 rounded-lg border p-3"
+                    >
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium">
+                          {formatDate(backup.createdAt)}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {backup.noteCount} 筆筆記
+                        </div>
+                      </div>
+                      <div className="flex gap-1 shrink-0">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="min-touch-target"
+                          onClick={() => handleRestoreCloudBackup(backup.id)}
+                          title="還原這份備份"
+                        >
+                          <RotateCcw className="h-4 w-4 mr-1" />
+                          還原
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="min-touch-target text-red-500"
+                          onClick={() => handleDeleteCloudBackup(backup.id)}
+                          title="刪除這份備份"
+                          aria-label="刪除這份雲端備份"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Other settings */}

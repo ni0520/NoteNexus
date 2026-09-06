@@ -1,6 +1,15 @@
 import { eq } from "drizzle-orm";
 import { db } from "./db";
-import { users, notes, type User, type InsertUser, type Note, type InsertNote } from "@shared/schema";
+import {
+  users,
+  notes,
+  noteBackups,
+  type User,
+  type InsertUser,
+  type Note,
+  type InsertNote,
+  type BackupNote,
+} from "@shared/schema";
 
 export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
@@ -13,6 +22,10 @@ export interface IStorage {
   deleteNote(id: number): Promise<boolean>;
   deleteAllNotes(): Promise<void>;
   importNotes(data: Array<InsertNote & { createdAt?: Date; updatedAt?: Date }>): Promise<Note[]>;
+  getBackups(): Promise<Array<{ id: number; createdAt: Date; noteCount: number }>>;
+  createBackup(data: BackupNote[]): Promise<typeof noteBackups.$inferSelect>;
+  getBackup(id: number): Promise<typeof noteBackups.$inferSelect | undefined>;
+  deleteBackup(id: number): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -67,6 +80,35 @@ export class DatabaseStorage implements IStorage {
     await this.deleteAllNotes();
     if (data.length === 0) return [];
     return db.insert(notes).values(data).returning();
+  }
+
+  async getBackups(): Promise<Array<{ id: number; createdAt: Date; noteCount: number }>> {
+    return db
+      .select({
+        id: noteBackups.id,
+        createdAt: noteBackups.createdAt,
+        noteCount: noteBackups.noteCount,
+      })
+      .from(noteBackups)
+      .orderBy(noteBackups.createdAt);
+  }
+
+  async createBackup(data: BackupNote[]): Promise<typeof noteBackups.$inferSelect> {
+    const [backup] = await db
+      .insert(noteBackups)
+      .values({ data, noteCount: data.length })
+      .returning();
+    return backup;
+  }
+
+  async getBackup(id: number): Promise<typeof noteBackups.$inferSelect | undefined> {
+    const [backup] = await db.select().from(noteBackups).where(eq(noteBackups.id, id));
+    return backup;
+  }
+
+  async deleteBackup(id: number): Promise<boolean> {
+    const result = await db.delete(noteBackups).where(eq(noteBackups.id, id)).returning();
+    return result.length > 0;
   }
 }
 

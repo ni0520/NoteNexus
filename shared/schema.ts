@@ -1,4 +1,4 @@
-import { pgTable, text, serial, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, boolean, timestamp, jsonb, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -25,6 +25,24 @@ export const notes = pgTable("notes", {
   isHidden: boolean("is_hidden").notNull().default(false),
   isPinned: boolean("is_pinned").notNull().default(false),
   color: text("color").notNull().default(""),
+});
+
+export type BackupNote = {
+  text: string;
+  tags: Array<{ name: string; color: string }>;
+  createdAt?: string;
+  updatedAt?: string;
+  isLocked: boolean;
+  isHidden: boolean;
+  isPinned: boolean;
+  color: string;
+};
+
+export const noteBackups = pgTable("note_backups", {
+  id: serial("id").primaryKey(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  noteCount: integer("note_count").notNull().default(0),
+  data: jsonb("data").$type<BackupNote[]>().notNull(),
 });
 
 const tagSchema = z.object({ name: z.string(), color: z.string() });
