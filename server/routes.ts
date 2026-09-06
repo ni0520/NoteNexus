@@ -1,11 +1,29 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
-import { insertNoteSchema, importNoteSchema, insertUserSchema, type BackupNote } from "@shared/schema";
-import { getUserId, hashPassword, publicUser, regenerateSession, requireAuth, destroySession, verifyPassword } from "./auth";
+import { storage, type IStorage } from "./storage";
+import {
+  createBackupSchema,
+  importNotesSchema,
+  insertNoteSchema,
+  insertUserSchema,
+  type BackupNote,
+} from "@shared/schema";
+import {
+  destroySession,
+  getUserId,
+  hashPassword,
+  INVALID_LOGIN_MESSAGE,
+  LoginRateLimiter,
+  publicUser,
+  regenerateSession,
+  requireAuth,
+  verifyPasswordOrDummy,
+} from "./auth";
 import { z } from "zod/v4";
 
-export async function registerRoutes(app: Express): Promise<Server> {
+export async function registerRoutes(app: Express, storageImplementation: IStorage = storage): Promise<Server> {
+  const loginIpLimiter = new LoginRateLimiter({ maxFailures: 20 });
+  const loginAccountLimiter = new LoginRateLimiter();
   const credentialsSchema = z.object({
     username: z.string().trim().min(3).max(40).regex(/^[a-zA-Z0-9_.-]+$/),
     password: z.string().min(8).max(128),
@@ -13,7 +31,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/auth/me", async (req, res) => {
     if (!req.session.userId) return res.status(401).json({ message: "Not authenticated" });
-    const user = await storage.getUser(req.session.userId);
+    const user = await storageImplementation.getUser(req.session.userId);
     if (!user) {
       await destroySession(req);
       return res.status(401).json({ message: "Not authenticated" });
@@ -27,10 +45,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     try {
       const username = parsed.data.username.toLowerCase();
-      const existingUser = await storage.getUserByUsername(username);
+      const existingUser = await storageImplementation.getUserByUsername(username);
       if (existingUser) return res.status(409).json({ message: "Username is already in use" });
 
-      const user = await storage.createUser({
+      const user = await storageImplementation.createUser({
         ...insertUserSchema.parse({ username, password: parsed.data.password }),
         password: await hashPassword(parsed.data.password),
       });
@@ -43,13 +61,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/auth/login", async (req, res) => {
     const parsed = credentialsSchema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ message: "Invalid username or password" });
+    if (!parsed.success) return res.status(400).json({ message: INVALID_LOGIN_MESSAGE });
 
     try {
-      const user = await storage.getUserByUsername(parsed.data.username.toLowerCase());
-      if (!user || !(await verifyPassword(parsed.data.password, user.password))) {
-        return res.status(401).json({ message: "Invalid username or password" });
+      const username = parsed.data.username.toLowerCase();
+      const sourceKey = req.ip || req.socket.remoteAddress || "unknown";
+      const accountKey = `${sourceKey}:${username}`;
+      const blocked = [loginIpLimiter.check(sourceKey), loginAccountLimiter.check(accountKey)]
+        .filter((result) => !result.allowed)
+        .sort((a, b) => (b.retryAfterSeconds ?? 0) - (a.retryAfterSeconds ?? 0))[0];
+
+      if (blocked) {
+        res.set("Retry-After", String(blocked.retryAfterSeconds ?? 60));
+        return res.status(429).json({ message: INVALID_LOGIN_MESSAGE });
       }
+
+      const user = await storageImplementation.getUserByUsername(username);
+      const passwordMatches = await verifyPasswordOrDummy(parsed.data.password, user?.password);
+      if (!user || !passwordMatches) {
+        loginIpLimiter.recordFailure(sourceKey);
+        loginAccountLimiter.recordFailure(accountKey);
+        return res.status(401).json({ message: INVALID_LOGIN_MESSAGE });
+      }
+
+      loginIpLimiter.reset(sourceKey);
+      loginAccountLimiter.reset(accountKey);
       await regenerateSession(req, user.id);
       res.json(publicUser(user));
     } catch (err) {
@@ -72,7 +108,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/notes", async (req, res) => {
     try {
-      const result = await storage.getNotes(getUserId(req));
+      const result = await storageImplementation.getNotes(getUserId(req));
       res.json(result);
     } catch (err) {
       res.status(500).json({ message: "Failed to fetch notes" });
@@ -85,7 +121,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(400).json({ message: parsed.error.message });
     }
     try {
-      const note = await storage.createNote(getUserId(req), parsed.data);
+      const note = await storageImplementation.createNote(getUserId(req), parsed.data);
       res.status(201).json(note);
     } catch (err) {
       res.status(500).json({ message: "Failed to create note" });
@@ -96,7 +132,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
     try {
-      const note = await storage.updateNote(getUserId(req), id, req.body);
+      const note = await storageImplementation.updateNote(getUserId(req), id, req.body);
       if (!note) return res.status(404).json({ message: "Note not found" });
       res.json(note);
     } catch (err) {
@@ -108,7 +144,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
     try {
-      const deleted = await storage.deleteNote(getUserId(req), id);
+      const deleted = await storageImplementation.deleteNote(getUserId(req), id);
       if (!deleted) return res.status(404).json({ message: "Note not found" });
       res.status(204).send();
     } catch (err) {
@@ -118,7 +154,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/notes", async (req, res) => {
     try {
-      await storage.deleteAllNotes(getUserId(req));
+      await storageImplementation.deleteAllNotes(getUserId(req));
       res.status(204).send();
     } catch (err) {
       res.status(500).json({ message: "Failed to clear notes" });
@@ -126,12 +162,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/notes/import", async (req, res) => {
-    const parsed = z.array(importNoteSchema).safeParse(req.body);
+    const parsed = importNotesSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ message: parsed.error.message });
     }
     try {
-      const result = await storage.importNotes(getUserId(req), parsed.data);
+      const result = await storageImplementation.importNotes(getUserId(req), parsed.data);
       res.status(201).json(result);
     } catch (err) {
       res.status(500).json({ message: "Failed to import notes" });
@@ -140,7 +176,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/backups", async (req, res) => {
     try {
-      const result = await storage.getBackups(getUserId(req));
+      const result = await storageImplementation.getBackups(getUserId(req));
       res.json(result);
     } catch (err) {
       res.status(500).json({ message: "Failed to fetch backups" });
@@ -148,7 +184,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/backups", async (req, res) => {
-    const parsed = z.object({ notes: z.array(importNoteSchema) }).safeParse(req.body);
+    const parsed = createBackupSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ message: parsed.error.message });
     }
@@ -164,7 +200,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isPinned: note.isPinned,
         color: note.color,
       }));
-      const backup = await storage.createBackup(getUserId(req), data);
+      const backup = await storageImplementation.createBackup(getUserId(req), data);
       res.status(201).json({
         id: backup.id,
         createdAt: backup.createdAt,
@@ -180,7 +216,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
 
     try {
-      const backup = await storage.getBackup(getUserId(req), id);
+      const backup = await storageImplementation.getBackup(getUserId(req), id);
       if (!backup) return res.status(404).json({ message: "Backup not found" });
 
       const notesToRestore = backup.data.map((note) => ({
@@ -193,7 +229,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         createdAt: note.createdAt ? new Date(note.createdAt) : undefined,
         updatedAt: note.updatedAt ? new Date(note.updatedAt) : undefined,
       }));
-      const restoredNotes = await storage.importNotes(getUserId(req), notesToRestore);
+      const restoredNotes = await storageImplementation.importNotes(getUserId(req), notesToRestore);
       res.json(restoredNotes);
     } catch (err) {
       res.status(500).json({ message: "Failed to restore backup" });
@@ -205,7 +241,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
 
     try {
-      const deleted = await storage.deleteBackup(getUserId(req), id);
+      const deleted = await storageImplementation.deleteBackup(getUserId(req), id);
       if (!deleted) return res.status(404).json({ message: "Backup not found" });
       res.status(204).send();
     } catch (err) {

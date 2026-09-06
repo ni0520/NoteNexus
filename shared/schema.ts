@@ -63,5 +63,8 @@ export const importNoteSchema = insertNoteSchema.extend({
   updatedAt: z.coerce.date().optional(),
 });
 
+export const importNotesSchema = z.array(importNoteSchema);
+export const createBackupSchema = z.object({ notes: z.array(importNoteSchema) });
+
 export type InsertNote = z.infer<typeof insertNoteSchema>;
 export type Note = typeof notes.$inferSelect;

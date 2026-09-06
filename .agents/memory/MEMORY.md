@@ -1,1 +1,2 @@
 - [Drizzle Session 表](drizzle-session-table.md) — 使用 connect-pg-simple 時，Drizzle push 必須排除 session 表，避免同步時誤刪除登入 Session。
+- [Database schema drift](database-schema-drift.md) — verify existing rows before applying schema changes that add required ownership columns.
