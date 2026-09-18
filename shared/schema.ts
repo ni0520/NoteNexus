@@ -47,24 +47,27 @@ export const noteBackups = pgTable("note_backups", {
   data: jsonb("data").$type<BackupNote[]>().notNull(),
 });
 
-const tagSchema = z.object({ name: z.string(), color: z.string() });
+const tagSchema = z.object({
+  name: z.string().trim().min(1).max(50),
+  color: z.string().max(32),
+});
 
 export const insertNoteSchema = z.object({
-  text: z.string().min(1),
-  tags: z.array(tagSchema).default([]),
+  text: z.string().min(1).max(100_000),
+  tags: z.array(tagSchema).max(100).default([]),
   isLocked: z.boolean().default(false),
   isHidden: z.boolean().default(false),
   isPinned: z.boolean().default(false),
-  color: z.string().default(""),
-});
+  color: z.string().max(32).default(""),
+}).strict();
 
 export const importNoteSchema = insertNoteSchema.extend({
   createdAt: z.coerce.date().optional(),
   updatedAt: z.coerce.date().optional(),
 });
 
-export const importNotesSchema = z.array(importNoteSchema);
-export const createBackupSchema = z.object({ notes: z.array(importNoteSchema) });
+export const importNotesSchema = z.array(importNoteSchema).max(10_000);
+export const createBackupSchema = z.object({ notes: z.array(importNoteSchema).max(10_000) }).strict();
 
 export type InsertNote = z.infer<typeof insertNoteSchema>;
 export type Note = typeof notes.$inferSelect;
