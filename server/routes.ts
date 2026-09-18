@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { storage, type IStorage } from "./storage";
+import type { IStorage } from "./storage";
 import {
   createBackupSchema,
   importNotesSchema,
@@ -21,7 +21,7 @@ import {
 } from "./auth";
 import { z } from "zod/v4";
 
-export async function registerRoutes(app: Express, storageImplementation: IStorage = storage): Promise<Server> {
+export async function registerRoutes(app: Express, storageImplementation: IStorage): Promise<Server> {
   const loginIpLimiter = new LoginRateLimiter({ maxFailures: 20 });
   const loginAccountLimiter = new LoginRateLimiter();
   const credentialsSchema = z.object({
@@ -96,7 +96,11 @@ export async function registerRoutes(app: Express, storageImplementation: IStora
   app.post("/api/auth/logout", async (req, res) => {
     try {
       await destroySession(req);
-      res.clearCookie("connect.sid");
+      res.clearCookie("notenexus.sid", {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: app.get("env") === "production",
+      });
       res.status(204).send();
     } catch (err) {
       res.status(500).json({ message: "Failed to sign out" });
@@ -131,8 +135,12 @@ export async function registerRoutes(app: Express, storageImplementation: IStora
   app.patch("/api/notes/:id", async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+    const parsed = insertNoteSchema.partial().strict().safeParse(req.body);
+    if (!parsed.success || Object.keys(parsed.data).length === 0) {
+      return res.status(400).json({ message: "Invalid note update" });
+    }
     try {
-      const note = await storageImplementation.updateNote(getUserId(req), id, req.body);
+      const note = await storageImplementation.updateNote(getUserId(req), id, parsed.data);
       if (!note) return res.status(404).json({ message: "Note not found" });
       res.json(note);
     } catch (err) {
