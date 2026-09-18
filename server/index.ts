@@ -1,13 +1,18 @@
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
+import helmet from "helmet";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { pool } from "./db";
+import { storage } from "./storage";
 
 const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+app.set("trust proxy", 1);
+app.disable("x-powered-by");
+app.use(helmet({ contentSecurityPolicy: false }));
+app.use(express.json({ limit: "1mb" }));
+app.use(express.urlencoded({ extended: false, limit: "1mb" }));
 
 if (!process.env.SESSION_SECRET) {
   throw new Error("SESSION_SECRET is not set");
@@ -15,6 +20,7 @@ if (!process.env.SESSION_SECRET) {
 
 const PgSession = connectPgSimple(session);
 app.use(session({
+  name: "notenexus.sid",
   store: new PgSession({ pool, createTableIfMissing: true }),
   secret: process.env.SESSION_SECRET,
   resave: false,
@@ -58,14 +64,18 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  const server = await registerRoutes(app);
+  const server = await registerRoutes(app, storage);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
-    res.status(status).json({ message });
-    throw err;
+    res.status(status).json({
+      message: app.get("env") === "production" && status >= 500
+        ? "Internal Server Error"
+        : message,
+    });
+    log(`request error (${status}): ${err instanceof Error ? err.message : String(err)}`);
   });
 
   // importantly only setup vite in development and after
